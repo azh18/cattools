@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel Processor</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <a href="{% url 'index' %}">← Back to Home</a>
+    <h1> 基金持有人大会表格处理 </h1>
+        <form id="upload-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="src_file"> 有完整数据的表 (src.xlsx):</label>
+        <input type="file" name="src_file" id="src_file" accept=".xlsx" required><br><br>
+        <label for="target_file"> 需要填充的表 (target.xlsx):</label>
+        <input type="file" name="target_file" id="target_file" accept=".xlsx" required><br><br>
+        <button type="submit"> 开始处理（由小狗狗的 ai 驱动~） </button>
+    </form>
+
+    <h2>Processing Log</h2>
+    <pre id="log"></pre>
+
+    <h2> 处理结果 </h2>
+    <div id="result"></div>
+
+    <script>
+        $(document).ready(function() {
+            $('#upload-form').on('submit', function(e) {
+                e.preventDefault();
+                var formData = new FormData(this);
+                $('#log').text('Uploading files...');
+                $('#result').empty(); // Clear previous result
+                $.ajax({
+                    url: '{% url "upload_files" %}',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(data) {
+                        var taskId = data.task_id;
+                        $('#log').text('Files uploaded. Processing started...');
+                        var interval = setInterval(function() {
+                            $.ajax({
+                                url: '{% url "status" %}?task_id=' + taskId,
+                                type: 'GET',
+                                success: function(data) {
+                                    $('#log').text(data.log);
+                                    if (data.status === 'SUCCESS') {
+                                        clearInterval(interval);
+                                        $('#result').html('<a href="{% url "download_result" %}?task_id=' + taskId + '">Download Result</a>');
+                                    } else if (data.status === 'FAILURE') {
+                                        clearInterval(interval);
+                                        $('#result').text('Processing failed.');
+                                    }
+                                }
+                            });
+                        }, 2000);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
